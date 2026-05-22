@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contorno Norte - Campinas</title>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/pmtiles@3/dist/pmtiles.js"></script>
+<style>
+  body { margin:0; padding:0; }
+  #map { width:100vw; height:100vh; }
+  .legend {
+    position:fixed; bottom:30px; left:10px; z-index:10;
+    background:#fff; padding:10px; border-radius:5px;
+    border:1px solid grey; font:12px sans-serif;
+  }
+  .controls {
+    position:fixed; top:10px; right:10px; z-index:10;
+    background:#fff; padding:10px; border-radius:5px;
+    border:1px solid grey; font:13px sans-serif; min-width:200px;
+  }
+  .controls label { display:block; cursor:pointer; padding:3px 0; }
+  .controls input { margin-right:6px; }
+  .controls h4 { margin:0 0 6px 0; font-size:13px; }
+  .controls select { width:100%; padding:4px; margin-bottom:8px; }
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div class="legend"><b>Sobrezoneamento</b><br>
+  <i style="background:#e41a1c;width:12px;height:12px;display:inline-block;margin-right:5px"></i> S1<br>
+  <i style="background:#377eb8;width:12px;height:12px;display:inline-block;margin-right:5px"></i> S2<br>
+  <i style="background:#4daf4a;width:12px;height:12px;display:inline-block;margin-right:5px"></i> S3<br>
+  <i style="background:#984ea3;width:12px;height:12px;display:inline-block;margin-right:5px"></i> S4<br>
+  <i style="background:#ff7f00;width:12px;height:12px;display:inline-block;margin-right:5px"></i> S5<br>
+  <i style="background:#ffff33;width:12px;height:12px;display:inline-block;margin-right:5px"></i> S6<br>
+</div>
+<div class="legend" style="bottom:250px"><b>APPs</b><br>
+  <i style="background:#e41a1c;width:12px;height:12px;display:inline-block;margin-right:5px"></i> Degradada<br>
+  <i style="background:#4daf4a;width:12px;height:12px;display:inline-block;margin-right:5px"></i> Preservada<br>
+</div>
+<div class="legend" style="bottom:390px"><b>Planos</b><br>
+  <i style="background:#7b3294;width:12px;height:12px;display:inline-block;margin-right:5px"></i> HIDS<br>
+  <i style="background:#008837;width:12px;height:12px;display:inline-block;margin-right:5px"></i> PIDS<br>
+</div>
+
+<div class="controls">
+  <h4>Mapa Base</h4>
+  <select id="basemap-select" onchange="changeBasemap(this.value)">
+    <option value="satellite">Satélite (Google)</option>
+    <option value="liberty">OpenFreeMap Liberty</option>
+  </select>
+  <h4>Camadas</h4>
+  <label><input type="checkbox" id="chk-zoning" checked onchange="toggle('zone',this.checked)"> Sobrezoneamento</label>
+  <label><input type="checkbox" id="chk-estrada" checked onchange="toggle('estrada',this.checked)"> ADA Contorno Norte</label>
+  <label><input type="checkbox" id="chk-limites" checked onchange="toggle('limites',this.checked)"> Limite Municipal</label>
+  <label><input type="checkbox" id="chk-apps" checked onchange="toggle('apps',this.checked)"> APPs Campinas</label>
+  <label><input type="checkbox" id="chk-hids" checked onchange="toggle('hids',this.checked)"> HIDS</label>
+  <label><input type="checkbox" id="chk-pids" checked onchange="toggle('pids',this.checked)"> PIDS</label>
+</div>
+
+<script>
+const pmtilesUrl = "merged.pmtiles";
+
+const basemaps = {
+  satellite: {
+    version: 8,
+    sources: {
+      "raster-tiles": {
+        type: "raster",
+        tiles: [
+          "https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+          "https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+          "https://mt2.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+          "https://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+        ],
+        tileSize: 256,
+      },
+    },
+    layers: [{ id: "raster-layer", type: "raster", source: "raster-tiles" }],
+  },
+  liberty: "https://tiles.openfreemap.org/styles/liberty",
+};
+
+const layerDefs = [
+  ["zone-fill", "fill", "sobrezoneamento", {
+    "fill-color": ["match", ["get", "DUOS"],
+      "S1","#e41a1c","S2","#377eb8","S3","#4daf4a",
+      "S4","#984ea3","S5","#ff7f00","S6","#ffff33","#cccccc"],
+    "fill-opacity": 0.5
+  }],
+  ["zone-line", "line", "sobrezoneamento", { "line-color": "#333", "line-width": 0.5 }],
+  ["estrada", "line", "estrada", { "line-color": "#d62728", "line-width": 3 }],
+  ["limites-fill", "line", "limites", { "fill-color": "#2ca02c", "fill-opacity": 0.1 }],
+  ["limites-line", "line", "limites", { "line-color": "#2ca02c", "line-width": 2 }],
+  ["apps-fill", "fill", "apps2", {
+    "fill-color": ["match", ["get", "SITUACAO"], "Degradada", "#e41a1c", "Preservada", "#4daf4a", "#ccc"],
+    "fill-opacity": 0.5
+  }],
+  ["apps-line", "line", "apps2", { "line-color": "#333", "line-width": 0.5 }],
+  ["hids-fill", "fill", "hids", { "fill-color": "#7b3294", "fill-opacity": 0.4 }],
+  ["hids-line", "line", "hids", { "line-color": "#7b3294", "line-width": 2 }],
+  ["pids-fill", "fill", "pids", { "fill-color": "#008837", "fill-opacity": 0.4 }],
+  ["pids-line", "line", "pids", { "line-color": "#008837", "line-width": 2 }],
+];
+
+const protocol = new pmtiles.Protocol();
+maplibregl.addProtocol("pmtiles", protocol.tile);
+
+const map = new maplibregl.Map({
+  container: "map",
+  style: basemaps.satellite,
+  center: [-47.03, -22.90],
+  zoom: 11
+});
+
+map.addControl(new maplibregl.NavigationControl(), "top-left");
+
+function addPMTilesLayers() {
+  if (map.getSource("v")) return;
+  map.addSource("v", { type: "vector", url: "pmtiles://" + pmtilesUrl });
+  for (const [id, type, sl, paint] of layerDefs) {
+    map.addLayer({ id, type, source: "v", "source-layer": sl, paint });
+  }
+}
+
+function changeBasemap(key) {
+  map.setStyle(basemaps[key]);
+  function waitStyle() {
+    if (map.isStyleLoaded()) addPMTilesLayers();
+    else setTimeout(waitStyle, 100);
+  }
+  setTimeout(waitStyle, 50);
+}
+
+map.on("load", addPMTilesLayers);
+
+// Click handlers — set once, work across style changes
+map.on("click", "zone-fill", e => {
+  new maplibregl.Popup().setLngLat(e.lngLat)
+    .setHTML("<b>Sobrezoneamento</b><br>DUOS: " + e.features[0].properties.DUOS).addTo(map);
+});
+map.on("mouseenter", "zone-fill", () => { map.getCanvas().style.cursor = "pointer"; });
+map.on("mouseleave", "zone-fill", () => { map.getCanvas().style.cursor = ""; });
+
+map.on("click", "estrada", e => {
+  new maplibregl.Popup().setLngLat(e.lngLat)
+    .setHTML("<b>ADA Contorno Norte</b>").addTo(map);
+});
+
+map.on("click", "apps-fill", e => {
+  const p = e.features[0].properties;
+  new maplibregl.Popup().setLngLat(e.lngLat)
+    .setHTML("<b>APP</b><br>Situação: " + p.SITUACAO + "<br>Área: " + p.AREA_HA + " ha").addTo(map);
+});
+map.on("mouseenter", "apps-fill", () => { map.getCanvas().style.cursor = "pointer"; });
+map.on("mouseleave", "apps-fill", () => { map.getCanvas().style.cursor = ""; });
+
+map.on("click", "hids-fill", e => {
+  const p = e.features[0].properties;
+  new maplibregl.Popup().setLngLat(e.lngLat)
+    .setHTML("<b>HIDS</b><br>" + p.DESCRICAO).addTo(map);
+});
+map.on("mouseenter", "hids-fill", () => { map.getCanvas().style.cursor = "pointer"; });
+map.on("mouseleave", "hids-fill", () => { map.getCanvas().style.cursor = ""; });
+
+map.on("click", "pids-fill", e => {
+  const p = e.features[0].properties;
+  new maplibregl.Popup().setLngLat(e.lngLat)
+    .setHTML("<b>PIDS</b><br>" + p.DESCRICAO).addTo(map);
+});
+map.on("mouseenter", "pids-fill", () => { map.getCanvas().style.cursor = "pointer"; });
+map.on("mouseleave", "pids-fill", () => { map.getCanvas().style.cursor = ""; });
+
+function toggle(prefix, show) {
+  const vis = show ? "visible" : "none";
+  const ids = prefix === "zone" ? ["zone-fill","zone-line"]
+    : prefix === "limites" ? ["limites-fill","limites-line"]
+    : prefix === "apps" ? ["apps-fill","apps-line"]
+    : prefix === "hids" ? ["hids-fill","hids-line"]
+    : prefix === "pids" ? ["pids-fill","pids-line"]
+    : [prefix];
+  ids.forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis); });
+}
+</script>
+</body>
+</html>
