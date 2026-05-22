@@ -38,6 +38,14 @@
   <i style="background:#ff7f00;width:12px;height:12px;display:inline-block;margin-right:5px"></i> S5<br>
   <i style="background:#ffff33;width:12px;height:12px;display:inline-block;margin-right:5px"></i> S6<br>
 </div>
+<div class="legend" style="bottom:250px"><b>APPs</b><br>
+  <i style="background:#e41a1c;width:12px;height:12px;display:inline-block;margin-right:5px"></i> Degradada<br>
+  <i style="background:#4daf4a;width:12px;height:12px;display:inline-block;margin-right:5px"></i> Preservada<br>
+</div>
+<div class="legend" style="bottom:390px"><b>Planos</b><br>
+  <i style="background:#7b3294;width:12px;height:12px;display:inline-block;margin-right:5px"></i> HIDS<br>
+  <i style="background:#008837;width:12px;height:12px;display:inline-block;margin-right:5px"></i> PIDS<br>
+</div>
 
 <div class="controls">
   <h4>Mapa Base</h4>
@@ -49,7 +57,9 @@
   <label><input type="checkbox" id="chk-zoning" checked onchange="toggle('zone',this.checked)"> Sobrezoneamento</label>
   <label><input type="checkbox" id="chk-estrada" checked onchange="toggle('estrada',this.checked)"> ADA Contorno Norte</label>
   <label><input type="checkbox" id="chk-limites" checked onchange="toggle('limites',this.checked)"> Limite Municipal</label>
-  <label><input type="checkbox" id="chk-apps" onchange="toggle('apps',this.checked)"> APPs Campinas</label>
+  <label><input type="checkbox" id="chk-apps" checked onchange="toggle('apps',this.checked)"> APPs Campinas</label>
+  <label><input type="checkbox" id="chk-hids" checked onchange="toggle('hids',this.checked)"> HIDS</label>
+  <label><input type="checkbox" id="chk-pids" checked onchange="toggle('pids',this.checked)"> PIDS</label>
 </div>
 
 <script>
@@ -91,6 +101,10 @@ const layerDefs = [
     "fill-opacity": 0.5
   }],
   ["apps-line", "line", "apps2", { "line-color": "#333", "line-width": 0.5 }],
+  ["hids-fill", "fill", "hids", { "fill-color": "#7b3294", "fill-opacity": 0.4 }],
+  ["hids-line", "line", "hids", { "line-color": "#7b3294", "line-width": 2 }],
+  ["pids-fill", "fill", "pids", { "fill-color": "#008837", "fill-opacity": 0.4 }],
+  ["pids-line", "line", "pids", { "line-color": "#008837", "line-width": 2 }],
 ];
 
 const protocol = new pmtiles.Protocol();
@@ -145,11 +159,29 @@ map.on("click", "apps-fill", e => {
 map.on("mouseenter", "apps-fill", () => { map.getCanvas().style.cursor = "pointer"; });
 map.on("mouseleave", "apps-fill", () => { map.getCanvas().style.cursor = ""; });
 
+map.on("click", "hids-fill", e => {
+  const p = e.features[0].properties;
+  new maplibregl.Popup().setLngLat(e.lngLat)
+    .setHTML("<b>HIDS</b><br>" + p.DESCRICAO).addTo(map);
+});
+map.on("mouseenter", "hids-fill", () => { map.getCanvas().style.cursor = "pointer"; });
+map.on("mouseleave", "hids-fill", () => { map.getCanvas().style.cursor = ""; });
+
+map.on("click", "pids-fill", e => {
+  const p = e.features[0].properties;
+  new maplibregl.Popup().setLngLat(e.lngLat)
+    .setHTML("<b>PIDS</b><br>" + p.DESCRICAO).addTo(map);
+});
+map.on("mouseenter", "pids-fill", () => { map.getCanvas().style.cursor = "pointer"; });
+map.on("mouseleave", "pids-fill", () => { map.getCanvas().style.cursor = ""; });
+
 function toggle(prefix, show) {
   const vis = show ? "visible" : "none";
   const ids = prefix === "zone" ? ["zone-fill","zone-line"]
     : prefix === "limites" ? ["limites-fill","limites-line"]
     : prefix === "apps" ? ["apps-fill","apps-line"]
+    : prefix === "hids" ? ["hids-fill","hids-line"]
+    : prefix === "pids" ? ["pids-fill","pids-line"]
     : [prefix];
   ids.forEach(id => { if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", vis); });
 }
